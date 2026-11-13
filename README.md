@@ -66,7 +66,8 @@ Bot Discord resmi untuk server **Wander Roleplay (FiveM)** yang dibangun menggun
     - **Autoplay**: Otomatis memutar lagu rekomendasi yang mirip setelah antrean habis.
     - **24/7 Mode**: Bot dapat diatur standby 24 jam nonstop di voice channel tanpa pernah disconnect.
     - **Now Playing Interaktif**: Dilengkapi tombol kontrol visual (Play/Pause, Skip, Stop, Loop, Autoplay, Volume Up/Down, Queue, 24/7).
-    - Mendukung pencarian instan dari YouTube, Spotify, SoundCloud, dan direct link.
+    - **Smart Search Tier (Spotify -> YouTube Fallback)**: Mengutamakan pencarian di Spotify terlebih dahulu; jika lagu tidak ada di Spotify (misal DJ/Remix/Cover), otomatis beralih mencari di YouTube, YouTube Music, dan SoundCloud tanpa macet.
+    - Mendukung pencarian link langsung (Spotify URL, YouTube URL, SoundCloud URL).
 
 ---
 
@@ -221,7 +222,8 @@ bot-wander/
 | `/fivem status & setup` | Semua / Admin | Cek status server FiveM live (pemain aktif, ping, connect) |
 | `/suggest kirim & review` | Semua / Admin | Kotak aspirasi warga dengan tombol vote setuju/tidak |
 | `/whitelist panel` | Owner & Admin | Formulir pendaftaran karakter IC & verifikasi warga baru |
-| `/music play` | Semua Warga | Putar lagu dari YouTube, Spotify, SoundCloud, atau judul lagu |
+| `/music play` | Semua Warga | Putar lagu dari Spotify, YouTube, Apple Music, SoundCloud, Deezer, Yandex, Audio File |
+| `/music sources` | Semua Warga | Lihat daftar 9+ platform & sumber streaming musik yang didukung |
 | `/music stop & skip` | Semua Warga | Hentikan pemutaran musik atau lewati ke lagu berikutnya |
 | `/music pause & resume`| Semua Warga | Jeda atau lanjutkan pemutaran musik saat ini |
 | `/music queue & nowplaying`| Semua Warga | Lihat daftar antrean lagu & progress bar lagu sekarang |
@@ -232,6 +234,29 @@ bot-wander/
 | `/ping` | Semua Warga | Cek latensi bot, RAM, uptime, dan status database |
 | `/help` | Semua Warga | Panduan interaktif menu bantuan bot |
 | `/serverinfo` | Semua Warga | Informasi kota Wander Roleplay, member, & link connect |
+
+---
+
+### 🎵 Sumber Musik yang Didukung (Supported Sources):
+Bot Wander Roleplay mendukung pemutaran dari seluruh sumber berikut via Lavalink v4:
+- 🔴 **YouTube** (URL Video, Shorts, Playlist, `ytsearch:`) ✅
+- 🟢 **Spotify** (URL Track, Album, Playlist, Artis, `spsearch:`) ✅
+- 🍎 **Apple Music** (URL Song, Album, Playlist, `amsearch:`) ✅
+- 🟠 **SoundCloud** (URL Track, Sets, `scsearch:`) ✅
+- 💙 **Deezer** (URL Track, Album, Playlist, `dzsearch:`) ✅
+- 🟡 **Yandex Music** (URL Track, Album, `ymsearch:`) ✅
+- 📻 **HTTP Streaming** (Radio online, Icecast, Shoutcast, `.m3u`, `.pls`) ✅
+- 📁 **HTTP Audio File** (Direct URL file `.mp3`, `.wav`, `.flac`, `.ogg`, `.m4a`, `.aac`) ✅
+- ✨ **And more!** (Twitch stream audio, Bandcamp, Custom web streams) ✅
+
+**🧠 Sistem Prioritas Pencarian Otomatis (Smart Multi-Tier):**
+Secara default, bot mencari judul di **Spotify** terlebih dahulu (`spsearch:`). Jika lagu tidak ditemukan di Spotify (misalnya versi cover, remix, atau DJ YouTube), bot secara otomatis dan mulus beralih ke **YouTube** (`ytsearch:`) dan platform lainnya tanpa macet! Anda juga dapat memilih sumber langsung pada opsi `/music play platform:[pilihan]`.
+
+**📻 Sistem Rekomendasi Autoplay Cerdas (Spotify & YouTube Radio Algorithm):**
+- **Terlihat di Antrean (`/music queue`)**: Saat Autoplay aktif, lagu rekomendasi berikutnya langsung disiapkan di latar belakang dan dapat dilihat di `/music queue` maupun card *Now Playing*, sehingga Anda tahu lagu apa yang akan diputar selanjutnya.
+- **Rekomendasi Genre Sejenis (Bukan Mengulang Lagu)**: Mirip dengan Spotify Radio atau YouTube Music Mix, jika ada yang me-request lagu (contoh: lagu dari *Yung Lean*), bot akan menganalisis genre & artis terkait (seperti cloud rap/sad boys/hip hop alternatif) dan memilih lagu sejenis yang bervariasi.
+- **Anti-Pengulangan (History Filter)**: Bot mencatat 50 lagu terakhir yang telah diputar serta menyaring varian judul (remix/slowed/re-upload) agar tidak memutar lagu yang sama lagi.
+- **Prioritas Request Warga**: Permintaan lagu manual dari warga melalui `/music play` selalu diprioritaskan sebelum lagu autoplay. Rekomendasi autoplay akan otomatis menyesuaikan diri dengan lagu baru yang diminta warga!
 
 ---
 

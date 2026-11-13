@@ -39,7 +39,9 @@ import { createSetupDashboardEmbed, createSetupDashboardRows } from '../commands
 import {
   buildNowPlayingEmbed,
   buildNowPlayingComponents,
-  formatMusicDuration
+  buildQueueEmbed,
+  formatMusicDuration,
+  prepareAutoplayNextTrack
 } from '../modules/musicManager.js';
 
 export async function onInteractionCreate(client: WanderBotClient, interaction: Interaction): Promise<void> {
@@ -79,10 +81,16 @@ export async function onInteractionCreate(client: WanderBotClient, interaction: 
         if (customId === 'music_toggle_pause') {
           if (player.paused) {
             await player.resume();
-            await interaction.reply({ content: '▶️ Musik dilanjutkan!', ephemeral: true });
+            await interaction.reply({
+              embeds: [createSuccessEmbed('MUSIK DILANJUTKAN', '▶️ Pemutaran musik telah dilanjutkan kembali!')],
+              ephemeral: true
+            });
           } else {
             await player.pause();
-            await interaction.reply({ content: '⏸️ Musik dijeda sementara!', ephemeral: true });
+            await interaction.reply({
+              embeds: [createSuccessEmbed('MUSIK DIJEDA', '⏸️ Pemutaran musik telah dijeda sementara!')],
+              ephemeral: true
+            });
           }
           const current = player.queue.current;
           if (current) {
@@ -95,17 +103,28 @@ export async function onInteractionCreate(client: WanderBotClient, interaction: 
 
         if (customId === 'music_skip') {
           await player.skip();
-          await interaction.reply({ content: '⏭️ Lagu berhasil dilewati!', ephemeral: true });
+          await interaction.reply({
+            embeds: [createSuccessEmbed('LAGU DILEWATI', '⏭️ Lagu berhasil dilewati ke lagu berikutnya!')],
+            ephemeral: true
+          });
           return;
         }
 
         if (customId === 'music_stop') {
           player.queue.tracks.splice(0, player.queue.tracks.length);
+          player.set('autoplay_next_track', null);
+          player.set('24/7', false);
           await player.stopPlaying();
-          if (!player.get('24/7')) {
-            await player.destroy();
-          }
-          await interaction.reply({ content: '⏹️ Pemutaran musik dihentikan dan antrean dibersihkan.', ephemeral: true });
+          await player.destroy();
+          await interaction.reply({
+            embeds: [
+              createSuccessEmbed(
+                'MUSIK DIHENTIKAN',
+                '⏹️ Pemutaran musik dihentikan, antrean dibersihkan, dan bot langsung keluar dari voice channel.'
+              )
+            ],
+            ephemeral: true
+          });
           await interaction.message.delete().catch(() => null);
           return;
         }
@@ -115,7 +134,10 @@ export async function onInteractionCreate(client: WanderBotClient, interaction: 
           const currentIndex = modes.indexOf(player.repeatMode);
           const nextMode = modes[(currentIndex + 1) % modes.length];
           await player.setRepeatMode(nextMode);
-          await interaction.reply({ content: `🔁 Mode Loop sekarang: **${nextMode.toUpperCase()}**`, ephemeral: true });
+          await interaction.reply({
+            embeds: [createSuccessEmbed('MODE LOOP DIATUR', `🔁 Mode Loop sekarang: **${nextMode.toUpperCase()}**`)],
+            ephemeral: true
+          });
           const current = player.queue.current;
           if (current) {
             const embed = buildNowPlayingEmbed(player, current);
@@ -128,7 +150,23 @@ export async function onInteractionCreate(client: WanderBotClient, interaction: 
         if (customId === 'music_toggle_autoplay') {
           const current = player.get('autoplay') === true;
           player.set('autoplay', !current);
-          await interaction.reply({ content: `📻 Autoplay sekarang: **${!current ? '🟢 ON' : '🔴 OFF'}**`, ephemeral: true });
+
+          if (!current) {
+            const cur = player.queue.tracks[player.queue.tracks.length - 1] || player.queue.current;
+            if (cur) prepareAutoplayNextTrack(player, client, cur).catch(() => null);
+          } else {
+            player.set('autoplay_next_track', null);
+          }
+
+          await interaction.reply({
+            embeds: [
+              createSuccessEmbed(
+                'MODE AUTOPLAY',
+                `📻 Autoplay sekarang: **${!current ? '🟢 ON (Rekomendasi genre sejenis otomatis disiapkan)' : '🔴 OFF'}**`
+              )
+            ],
+            ephemeral: true
+          });
           const cur = player.queue.current;
           if (cur) {
             const embed = buildNowPlayingEmbed(player, cur);
@@ -141,7 +179,15 @@ export async function onInteractionCreate(client: WanderBotClient, interaction: 
         if (customId === 'music_toggle_247') {
           const current = player.get('24/7') === true;
           player.set('24/7', !current);
-          await interaction.reply({ content: `⏰ Mode 24/7 Standby sekarang: **${!current ? '🟢 ON' : '🔴 OFF'}**`, ephemeral: true });
+          await interaction.reply({
+            embeds: [
+              createSuccessEmbed(
+                'MODE 24/7 STANDBY',
+                `⏰ Mode 24/7 Standby sekarang: **${!current ? '🟢 ON (Bot standby 24 jam)' : '🔴 OFF'}**`
+              )
+            ],
+            ephemeral: true
+          });
           const cur = player.queue.current;
           if (cur) {
             const embed = buildNowPlayingEmbed(player, cur);
@@ -154,7 +200,10 @@ export async function onInteractionCreate(client: WanderBotClient, interaction: 
         if (customId === 'music_vol_down') {
           const newVol = Math.max(player.volume - 10, 10);
           await player.setVolume(newVol);
-          await interaction.reply({ content: `🔉 Volume dikurangi menjadi: **${newVol}%**`, ephemeral: true });
+          await interaction.reply({
+            embeds: [createSuccessEmbed('VOLUME DIATUR', `🔉 Volume dikurangi menjadi: **${newVol}%**`)],
+            ephemeral: true
+          });
           const cur = player.queue.current;
           if (cur) {
             const embed = buildNowPlayingEmbed(player, cur);
@@ -167,7 +216,10 @@ export async function onInteractionCreate(client: WanderBotClient, interaction: 
         if (customId === 'music_vol_up') {
           const newVol = Math.min(player.volume + 10, 150);
           await player.setVolume(newVol);
-          await interaction.reply({ content: `🔊 Volume dinaikkan menjadi: **${newVol}%**`, ephemeral: true });
+          await interaction.reply({
+            embeds: [createSuccessEmbed('VOLUME DIATUR', `🔊 Volume dinaikkan menjadi: **${newVol}%**`)],
+            ephemeral: true
+          });
           const cur = player.queue.current;
           if (cur) {
             const embed = buildNowPlayingEmbed(player, cur);
@@ -178,19 +230,7 @@ export async function onInteractionCreate(client: WanderBotClient, interaction: 
         }
 
         if (customId === 'music_show_queue') {
-          const current = player.queue.current;
-          const tracks = player.queue.tracks;
-          const embed = createBaseEmbed()
-            .setTitle(`📜 DAFTAR ANTREAN MUSIK`)
-            .setDescription(
-              `🎵 **Sedang Diputar:**\n` +
-                (current ? `>>> [${current.info.title}](${current.info.uri}) (\`${formatMusicDuration(current.info.duration || 0)}\`)` : '*Tidak ada*') +
-                `\n\n📋 **Antrean Berikutnya:**\n` +
-                (tracks.length === 0
-                  ? '*Antrean kosong.*'
-                  : tracks.slice(0, 10).map((t, idx) => `**${idx + 1}.** [${t.info.title}](${t.info.uri}) (\`${formatMusicDuration(t.info.duration || 0)}\`)`).join('\n')) +
-                (tracks.length > 10 ? `\n*...dan ${tracks.length - 10} lagu lainnya.*` : '')
-            );
+          const embed = buildQueueEmbed(player, interaction.guild?.name);
           await interaction.reply({ embeds: [embed], ephemeral: true });
           return;
         }
@@ -330,9 +370,9 @@ export async function onInteractionCreate(client: WanderBotClient, interaction: 
           .setTitle(`📊 VOTING WARGA: ${poll.question.toUpperCase()}`)
           .setDescription(
             `Silakan berikan suara kamu dengan menekan tombol pilihan di bawah!\n\n` +
-              `${updatedText}` +
-              `👥 **Total Suara:** **${totalVotes}** suara\n` +
-              `👮 **Pembuat:** <@${poll.creator_id}>`
+            `${updatedText}` +
+            `👥 **Total Suara:** **${totalVotes}** suara\n` +
+            `👮 **Pembuat:** <@${poll.creator_id}>`
           )
           .setColor('#3498DB');
 
@@ -606,8 +646,8 @@ export async function onInteractionCreate(client: WanderBotClient, interaction: 
                 createSuccessEmbed(
                   'PENDAFTARAN WARGA DISETUJUI!',
                   `Selamat <@${applicant.id}>! Formulir pendaftaran karakter IC kamu (**${sub.ic_name}**) telah resmi **DISETUJUI** oleh Staff **Wander Roleplay**.\n\n` +
-                    `Role warga kota telah diberikan ke akunmu. Selamat menikmati roleplay di Kota Wander!\n` +
-                    `🔗 **Connect:** \`${config.server.cfxConnect}\``
+                  `Role warga kota telah diberikan ke akunmu. Selamat menikmati roleplay di Kota Wander!\n` +
+                  `🔗 **Connect:** \`${config.server.cfxConnect}\``
                 )
               ]
             });
@@ -621,9 +661,9 @@ export async function onInteractionCreate(client: WanderBotClient, interaction: 
           .setColor('#2ECC71')
           .setDescription(
             `Warga: <@${sub.user_id}> (\`${sub.user_tag}\`)\n` +
-              `Nama IC: **${sub.ic_name}** (${sub.ic_age})\n\n` +
-              `👮 **Diterima Oleh:** <@${interaction.user.id}>\n` +
-              `⏰ **Waktu:** <t:${Math.floor(Date.now() / 1000)}:R>`
+            `Nama IC: **${sub.ic_name}** (${sub.ic_age})\n\n` +
+            `👮 **Diterima Oleh:** <@${interaction.user.id}>\n` +
+            `⏰ **Waktu:** <t:${Math.floor(Date.now() / 1000)}:R>`
           );
 
         await interaction.update({ embeds: [approvedEmbed], components: [] });
@@ -650,7 +690,7 @@ export async function onInteractionCreate(client: WanderBotClient, interaction: 
                 createErrorEmbed(
                   'PENDAFTARAN WARGA DITOLAK',
                   `Halo <@${applicant.id}>, mohon maaf pendaftaran karakter IC kamu (**${sub.ic_name}**) di **Wander Roleplay** belum disetujui.\n\n` +
-                    `Pastikan untuk membaca peraturan kota dan mengisi formulir dengan lebih detail. Kamu dapat mengajukan pendaftaran ulang.`
+                  `Pastikan untuk membaca peraturan kota dan mengisi formulir dengan lebih detail. Kamu dapat mengajukan pendaftaran ulang.`
                 )
               ]
             });
@@ -664,9 +704,9 @@ export async function onInteractionCreate(client: WanderBotClient, interaction: 
           .setColor('#E74C3C')
           .setDescription(
             `Warga: <@${sub.user_id}> (\`${sub.user_tag}\`)\n` +
-              `Nama IC: **${sub.ic_name}** (${sub.ic_age})\n\n` +
-              `👮 **Ditolak Oleh:** <@${interaction.user.id}>\n` +
-              `⏰ **Waktu:** <t:${Math.floor(Date.now() / 1000)}:R>`
+            `Nama IC: **${sub.ic_name}** (${sub.ic_age})\n\n` +
+            `👮 **Ditolak Oleh:** <@${interaction.user.id}>\n` +
+            `⏰ **Waktu:** <t:${Math.floor(Date.now() / 1000)}:R>`
           );
 
         await interaction.update({ embeds: [rejectedEmbed], components: [] });
@@ -712,118 +752,122 @@ export async function onInteractionCreate(client: WanderBotClient, interaction: 
             .setTitle('⚙️ PANDUAN SETUP & PENGATURAN BOT (OWNER & ADMIN)')
             .setDescription(
               `Perintah kontrol terpusat untuk mengatur, mengganti, dan menghapus konfigurasi bot sesuka hati:\n\n` +
-                `• \`/setup dashboard\`\n` +
-                `  *Membuka panel kontrol visual lengkap dengan tombol toggle aktif/nonaktif fitur secara instan.*\n\n` +
-                `• \`/setup channel [jenis] [channel] [hapus_channel?]\`\n` +
-                `  *Atur atau ganti channel tujuan fungsi bot. Centang \`hapus_channel: true\` jika ingin mengosongkan/menghapus channel tersebut.*\n` +
-                `  *Pilihan jenis: Mod-Logs, Ticket-Logs, Welcome, Goodbye, Honeypot, Kotak Saran, Whitelist.*\n\n` +
-                `• \`/setup role [jenis] [role] [hapus_role?]\`\n` +
-                `  *Atur, ganti, atau hapus role Admin, Moderator, dan Citizen/Warga Baru.*\n\n` +
-                `• \`/setup features [fitur] [status]\`\n` +
-                `  *Nyalakan atau matikan fitur (Honeypot, Anti-Invite, Welcome, Goodbye).*\n\n` +
-                `• \`/setup reset [target]\`\n` +
-                `  *Mereset pengaturan tertentu atau reset total ke kondisi bawaan server.*\n\n` +
-                `• \`/settings view\` & \`/settings reload\`\n` +
-                `  *Melihat ringkasan konfigurasi aktif atau memuat ulang file config.json tanpa restart bot.*`
+              `• \`/setup dashboard\`\n` +
+              `  *Membuka panel kontrol visual lengkap dengan tombol toggle aktif/nonaktif fitur secara instan.*\n\n` +
+              `• \`/setup channel [jenis] [channel] [hapus_channel?]\`\n` +
+              `  *Atur atau ganti channel tujuan fungsi bot. Centang \`hapus_channel: true\` jika ingin mengosongkan/menghapus channel tersebut.*\n` +
+              `  *Pilihan jenis: Mod-Logs, Ticket-Logs, Welcome, Goodbye, Honeypot, Kotak Saran, Whitelist.*\n\n` +
+              `• \`/setup role [jenis] [role] [hapus_role?]\`\n` +
+              `  *Atur, ganti, atau hapus role Admin, Moderator, dan Citizen/Warga Baru.*\n\n` +
+              `• \`/setup features [fitur] [status]\`\n` +
+              `  *Nyalakan atau matikan fitur (Honeypot, Anti-Invite, Welcome, Goodbye).*\n\n` +
+              `• \`/setup reset [target]\`\n` +
+              `  *Mereset pengaturan tertentu atau reset total ke kondisi bawaan server.*\n\n` +
+              `• \`/settings view\` & \`/settings reload\`\n` +
+              `  *Melihat ringkasan konfigurasi aktif atau memuat ulang file config.json tanpa restart bot.*`
             );
         } else if (selected === 'help_moderation') {
           embed.setTitle('🛡️ PANDUAN PERINTAH MODERASI')
             .setDescription(
               `Perintah moderasi dilindungi hak akses ketat (Hanya Server Owner & Admin):\n\n` +
-                `• \`/ban [user] [alasan] [hapus_pesan_hari]\` — Banned warga permanen.\n` +
-                `• \`/unban [user_id] [alasan]\` — Cabut hukuman banned via User ID.\n` +
-                `• \`/kick [user] [alasan]\` — Keluarkan warga dari server.\n` +
-                `• \`/timeout [user] [durasi (10m, 1h, 1d)] [alasan]\` — Mute/bungkam sementara.\n` +
-                `• \`/untimeout [user]\` — Cabut mute/timeout warga.\n` +
-                `• \`/warn [user] [alasan]\` — Berikan peringatan resmi ke warga.\n` +
-                `• \`/warnings [user]\` — Cek riwayat pelanggaran warga di database.\n` +
-                `• \`/clearwarn [user] [warn_id?]\` — Hapus pelanggaran tertentu/semua.\n` +
-                `• \`/purge [jumlah 1-100] [target?]\` — Hapus pesan massal di channel.\n` +
-                `• \`/slowmode [detik]\` — Atur jeda slowmode channel.\n` +
-                `• \`/lock\` & \`/unlock\` — Kunci/buka akses chat channel.`
+              `• \`/ban [user] [alasan] [hapus_pesan_hari]\` — Banned warga permanen.\n` +
+              `• \`/unban [user_id] [alasan]\` — Cabut hukuman banned via User ID.\n` +
+              `• \`/kick [user] [alasan]\` — Keluarkan warga dari server.\n` +
+              `• \`/timeout [user] [durasi (10m, 1h, 1d)] [alasan]\` — Mute/bungkam sementara.\n` +
+              `• \`/untimeout [user]\` — Cabut mute/timeout warga.\n` +
+              `• \`/warn [user] [alasan]\` — Berikan peringatan resmi ke warga.\n` +
+              `• \`/warnings [user]\` — Cek riwayat pelanggaran warga di database.\n` +
+              `• \`/clearwarn [user] [warn_id?]\` — Hapus pelanggaran tertentu/semua.\n` +
+              `• \`/purge [jumlah 1-100] [target?]\` — Hapus pesan massal di channel.\n` +
+              `• \`/slowmode [detik]\` — Atur jeda slowmode channel.\n` +
+              `• \`/lock\` & \`/unlock\` — Kunci/buka akses chat channel.`
             );
         } else if (selected === 'help_tickets') {
           embed.setTitle('🎫 PANDUAN SISTEM TIKET BANTUAN')
             .setDescription(
               `Sistem tiket interaktif customer support Wander Roleplay:\n\n` +
-                `• \`/ticket panel [channel] [kategori?]\` — Kirim embed panel open ticket dengan menu dropdown pilihan kategori.\n` +
-                `• \`/ticket claim\` — Staff mengklaim penanganan tiket.\n` +
-                `• \`/ticket transcript\` — Unduh arsip percakapan tiket (.txt).\n` +
-                `• \`/ticket close\` — Menutup dan menghapus tiket dengan arsip log otomatis.`
+              `• \`/ticket panel [channel] [kategori?]\` — Kirim embed panel open ticket dengan menu dropdown pilihan kategori.\n` +
+              `• \`/ticket claim\` — Staff mengklaim penanganan tiket.\n` +
+              `• \`/ticket transcript\` — Unduh arsip percakapan tiket (.txt).\n` +
+              `• \`/ticket close\` — Menutup dan menghapus tiket dengan arsip log otomatis.`
             );
         } else if (selected === 'help_announcement') {
           embed.setTitle('📢 PANDUAN PENGUMUMAN / BROADCAST')
             .setDescription(
               `Mengirimkan pengumuman resmi bot dengan bebas enter/longkap bawah:\n\n` +
-                `• \`/announcement interactive [channel] [format: embed/plain] [mention?]\`\n` +
-                `  *Memulai sesi interaktif. Kamu tinggal ketik pesan pengumuman kamu di chat (bebas enter/longkap bawah), lalu bot akan menampilkan preview dan tombol konfirmasi.*\n\n` +
-                `• \`/announcement modal [channel] [mention?]\`\n` +
-                `  *Membuka jendela pop-up Discord multiline untuk mengetik judul, isi pesan, dan banner.*\n\n` +
-                `• \`/announcement quick [channel] [pesan] [judul?]\`\n` +
-                `  *Kirim pesan pengumuman cepat dalam satu baris perintah.*`
+              `• \`/announcement interactive [channel] [format: embed/plain] [mention?]\`\n` +
+              `  *Memulai sesi interaktif. Kamu tinggal ketik pesan pengumuman kamu di chat (bebas enter/longkap bawah), lalu bot akan menampilkan preview dan tombol konfirmasi.*\n\n` +
+              `• \`/announcement modal [channel] [mention?]\`\n` +
+              `  *Membuka jendela pop-up Discord multiline untuk mengetik judul, isi pesan, dan banner.*\n\n` +
+              `• \`/announcement quick [channel] [pesan] [judul?]\`\n` +
+              `  *Kirim pesan pengumuman cepat dalam satu baris perintah.*`
             );
         } else if (selected === 'help_honeypot') {
           embed.setTitle('🍯 PANDUAN SISTEM JEBAKAN HONEYPOT')
             .setDescription(
               `Sistem jebakan pelindung dari raid bot dan spammer token:\n\n` +
-                `• \`/honeypot setup [channel] [tindakan: ban/kick/timeout]\`\n` +
-                `  *Menunjuk sebuah channel sebagai perangkap. Siapapun akun asing yang mengetik di channel ini akan langsung ditindak secara otomatis & riwayat spam dihapus.*\n\n` +
-                `• \`/honeypot status\` — Melihat status keaktifan jebakan.\n` +
-                `• \`/honeypot disable\` — Menonaktifkan sistem honeypot.\n` +
-                `• \`/honeypot logs\` — Melihat daftar akun yang tertangkap.`
+              `• \`/honeypot setup [channel] [tindakan: ban/kick/timeout]\`\n` +
+              `  *Menunjuk sebuah channel sebagai perangkap. Siapapun akun asing yang mengetik di channel ini akan langsung ditindak secara otomatis & riwayat spam dihapus.*\n\n` +
+              `• \`/honeypot status\` — Melihat status keaktifan jebakan.\n` +
+              `• \`/honeypot disable\` — Menonaktifkan sistem honeypot.\n` +
+              `• \`/honeypot logs\` — Melihat daftar akun yang tertangkap.`
             );
         } else if (selected === 'help_fivem_community') {
           embed.setTitle('🏙️ PANDUAN FIVEM & KOMUNITAS WARGA')
             .setDescription(
               `Fitur khusus komunitas & server FiveM Wander Roleplay:\n\n` +
-                `• \`/fivem status\` — Pantau server FiveM live (jumlah warga di kota, ping, connect link).\n` +
-                `• \`/fivem setup [channel]\` — Pasang panel live monitor server auto-refresh tiap menit.\n` +
-                `• \`/suggest kirim [saran]\` — Warga kirim aspirasi ke kotak saran dengan tombol vote setuju/tidak.\n` +
-                `• \`/suggest review [id] [keputusan] [catatan?]\` — Staff meninjau saran warga dan kirim DM hasil keputusan.\n` +
-                `• \`/whitelist panel [channel]\` — Pasang formulir pendaftaran warga masuk kota dengan form IC.`
+              `• \`/fivem status\` — Pantau server FiveM live (jumlah warga di kota, ping, connect link).\n` +
+              `• \`/fivem setup [channel]\` — Pasang panel live monitor server auto-refresh tiap menit.\n` +
+              `• \`/suggest kirim [saran]\` — Warga kirim aspirasi ke kotak saran dengan tombol vote setuju/tidak.\n` +
+              `• \`/suggest review [id] [keputusan] [catatan?]\` — Staff meninjau saran warga dan kirim DM hasil keputusan.\n` +
+              `• \`/whitelist panel [channel]\` — Pasang formulir pendaftaran warga masuk kota dengan form IC.`
             );
         } else if (selected === 'help_welcome_roles') {
           embed.setTitle('👋 WELCOME, GOODBYE & TAKE ROLE')
             .setDescription(
               `• \`/welcome setup [channel] [auto_role?] [pesan?]\` — Atur ucapan selamat datang & auto-role warga baru.\n` +
-                `• \`/welcome test\` — Preview tampilan sambutan.\n` +
-                `• \`/goodbye setup [channel] [pesan?]\` — Atur pesan warga keluar kota.\n` +
-                `• \`/takerole notifications [channel] ...\` — Buat panel ambil role notifikasi.\n` +
-                `• \`/takerole gender [channel] ...\` — Buat panel role identitas gender IC.\n` +
-                `• \`/takerole custom [channel] [judul] [deskripsi] ...\` — Buat panel role custom dengan tombol.`
+              `• \`/welcome test\` — Preview tampilan sambutan.\n` +
+              `• \`/goodbye setup [channel] [pesan?]\` — Atur pesan warga keluar kota.\n` +
+              `• \`/takerole notifications [channel] ...\` — Buat panel ambil role notifikasi.\n` +
+              `• \`/takerole gender [channel] ...\` — Buat panel role identitas gender IC.\n` +
+              `• \`/takerole custom [channel] [judul] [deskripsi] ...\` — Buat panel role custom dengan tombol.`
             );
         } else if (selected === 'help_giveaway_poll') {
           embed.setTitle('🎉 GIVEAWAY & POLLING SUARA')
             .setDescription(
               `• \`/giveaway start [hadiah] [durasi] [pemenang] [channel?]\` — Memulai undian giveaway berhadiah dengan tombol join.\n` +
-                `• \`/giveaway end [message_id]\` — Mengakhiri giveaway seketika.\n` +
-                `• \`/giveaway reroll [message_id]\` — Memilih ulang pemenang baru.\n` +
-                `• \`/poll create [pertanyaan] [opsi1] [opsi2] ...\` — Membuat voting interaktif dengan live grafik batang.\n` +
-                `• \`/poll end [message_id]\` — Menutup polling dan menampilkan hasil akhir.`
+              `• \`/giveaway end [message_id]\` — Mengakhiri giveaway seketika.\n` +
+              `• \`/giveaway reroll [message_id]\` — Memilih ulang pemenang baru.\n` +
+              `• \`/poll create [pertanyaan] [opsi1] [opsi2] ...\` — Membuat voting interaktif dengan live grafik batang.\n` +
+              `• \`/poll end [message_id]\` — Menutup polling dan menampilkan hasil akhir.`
             );
         } else if (selected === 'help_music') {
           embed.setTitle('🎵 PANDUAN SISTEM MUSIK (LAVALINK V4)')
             .setDescription(
               `Pemutar musik audio jernih bertenaga Lavalink v4 gratis Serenetia:\n\n` +
-                `• \`/music play [lagu/link]\` — Putar lagu dari YouTube, Spotify, SoundCloud, atau kata kunci pencarian.\n` +
-                `• \`/music stop\` — Berhenti memutar dan bersihkan antrean lagu.\n` +
-                `• \`/music skip\` — Lewati lagu yang sedang diputar ke lagu berikutnya.\n` +
-                `• \`/music pause\` & \`/music resume\` — Jeda atau lanjutkan pemutaran musik.\n` +
-                `• \`/music queue\` — Lihat daftar 10 lagu antrean teratas.\n` +
-                `• \`/music nowplaying\` — Lihat detail lagu yang diputar, lirik, dan progress bar.\n` +
-                `• \`/music autoplay [status?]\` — Mode putar otomatis lagu rekomendasi mirip setelah antrean habis.\n` +
-                `• \`/music 247 [status?]\` — Mode 24 jam bot standby di voice channel tanpa pernah disconnect.\n` +
-                `• \`/music volume [1-150]\` — Sesuaikan kenyaringan volume audio bot.\n` +
-                `• \`/music loop [track/queue/off]\` — Ulangi 1 lagu atau seluruh playlist.\n` +
-                `• \`/music shuffle\` — Acak urutan lagu dalam antrean.\n\n` +
-                `💡 **Tombol Kontrol Interaktif:** Setiap lagu diputar, bot mengirimkan kontrol Now Playing dengan tombol Pause, Skip, Stop, Loop, Autoplay, Volume, dan 24/7.`
+              `• \`/music play [lagu/link] [platform?]\` — Putar lagu/link dari Spotify, YouTube, Apple Music, SoundCloud, Deezer, Yandex, HTTP Stream/File.\n` +
+              `• \`/music sources\` — Lihat daftar 9+ platform & sumber audio yang didukung.\n` +
+              `• \`/music stop\` — Berhenti memutar dan bersihkan antrean lagu.\n` +
+              `• \`/music skip\` — Lewati lagu yang sedang diputar ke lagu berikutnya.\n` +
+              `• \`/music pause\` & \`/music resume\` — Jeda atau lanjutkan pemutaran musik.\n` +
+              `• \`/music queue\` — Lihat daftar 10 lagu antrean teratas.\n` +
+              `• \`/music nowplaying\` — Lihat detail lagu yang diputar, thumbnail, dan progress bar.\n` +
+              `• \`/music autoplay [status?]\` — Mode putar otomatis lagu rekomendasi mirip setelah antrean habis.\n` +
+              `• \`/music 247 [status?]\` — Mode 24 jam bot standby di voice channel tanpa pernah disconnect.\n` +
+              `• \`/music volume [1-150]\` — Sesuaikan kenyaringan volume audio bot.\n` +
+              `• \`/music loop [track/queue/off]\` — Ulangi 1 lagu atau seluruh playlist.\n` +
+              `• \`/music shuffle\` — Acak urutan lagu dalam antrean.\n\n` +
+              `🌐 **Multi-Platform Support:**\n` +
+              `🔴 YouTube | 🟢 Spotify | 🍎 Apple Music | 🟠 SoundCloud | 💙 Deezer | 🟡 Yandex Music | 📻 HTTP Streaming | 📁 HTTP Audio File (.mp3/.flac/.wav) | ✨ And More!\n\n` +
+              `💡 **Sistem Cerdas Spotify ➔ YouTube:**\n` +
+              `Pencarian otomatis mengutamakan Spotify terlebih dahulu. Jika tidak ada di Spotify, bot otomatis mencari ke YouTube & platform lainnya tanpa terhenti!`
             );
         } else if (selected === 'help_general') {
           embed.setTitle('ℹ️ INFORMASI UMUM & UTILITAS')
             .setDescription(
               `• \`/ping\` — Mengecek kecepatan respons bot, discord websocket latency, memory RAM, dan database SQLite.\n` +
-                `• \`/serverinfo\` — Menampilkan statistik lengkap server Discord dan FiveM Wander Roleplay.\n` +
-                `• \`/help\` — Membuka panduan interaktif seluruh sistem bot.`
+              `• \`/serverinfo\` — Menampilkan statistik lengkap server Discord dan FiveM Wander Roleplay.\n` +
+              `• \`/help\` — Membuka panduan interaktif seluruh sistem bot.`
             );
         }
 
@@ -898,10 +942,10 @@ export async function onInteractionCreate(client: WanderBotClient, interaction: 
               .setColor('#F1C40F')
               .setDescription(
                 `Pendaftaran masuk kota dari <@${interaction.user.id}> (\`${interaction.user.tag}\`):\n\n` +
-                  `👤 **Nama Karakter IC:** **${icName}**\n` +
-                  `🎂 **Usia & TTL:** ${icAge}\n\n` +
-                  `📖 **Cerita Karakter & Minat:**\n>>> ${story}\n\n` +
-                  `📜 **Jawaban Rules RP:**\n>>> ${rules}`
+                `👤 **Nama Karakter IC:** **${icName}**\n` +
+                `🎂 **Usia & TTL:** ${icAge}\n\n` +
+                `📖 **Cerita Karakter & Minat:**\n>>> ${story}\n\n` +
+                `📜 **Jawaban Rules RP:**\n>>> ${rules}`
               )
               .setThumbnail(interaction.user.displayAvatarURL())
               .setFooter({ text: `ID Pendaftaran: #${subId} • ${config.server.footerText}` });

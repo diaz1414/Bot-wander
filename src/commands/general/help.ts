@@ -123,7 +123,7 @@ export const helpCommand: Command = {
         },
         {
           name: '🎵 Sistem Musik (Lavalink v4)',
-          value: '`/music play`, `/music stop`, `/music skip`, `/music autoplay`, `/music 247`, `/music queue`, `/music volume`',
+          value: '`/music play`, `/music sources`, `/music stop`, `/music skip`, `/music autoplay`, `/music 247`, `/music queue`, `/music volume`',
           inline: true
         }
       )

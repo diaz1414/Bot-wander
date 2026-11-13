@@ -9,7 +9,10 @@ import { createBaseEmbed, createSuccessEmbed, createErrorEmbed } from '../../uti
 import {
   buildNowPlayingEmbed,
   buildNowPlayingComponents,
-  formatMusicDuration
+  buildQueueEmbed,
+  formatMusicDuration,
+  prepareAutoplayNextTrack,
+  smartSearch
 } from '../../modules/musicManager.js';
 import type { WanderBotClient } from '../../client.js';
 
@@ -53,11 +56,31 @@ export const musicCommand: Command = {
     .addSubcommand((sub) =>
       sub
         .setName('play')
-        .setDescription('Putar lagu dari YouTube, Spotify, SoundCloud, atau judul lagu')
+        .setDescription('Putar lagu/link dari Spotify, YouTube, Apple Music, SoundCloud, Deezer, Yandex, dll')
         .addStringOption((opt) =>
-          opt.setName('lagu').setDescription('Judul lagu atau link musik').setRequired(true)
+          opt
+            .setName('lagu')
+            .setDescription('Judul lagu atau link URL (Spotify / YouTube / Apple / SoundCloud / Deezer / Audio)')
+            .setRequired(true)
+        )
+        .addStringOption((opt) =>
+          opt
+            .setName('platform')
+            .setDescription('Prioritas sumber (Default: Cari Spotify dulu -> Fallback YouTube jika tidak ada)')
+            .setRequired(false)
+            .addChoices(
+              { name: '✨ Otomatis (Spotify ➔ YouTube ➔ Lainnya)', value: 'auto' },
+              { name: '🟢 Spotify', value: 'spotify' },
+              { name: '🔴 YouTube', value: 'youtube' },
+              { name: '🍎 Apple Music', value: 'applemusic' },
+              { name: '🟠 SoundCloud', value: 'soundcloud' },
+              { name: '💙 Deezer', value: 'deezer' },
+              { name: '🟡 Yandex Music', value: 'yandex' },
+              { name: '🎵 YouTube Music', value: 'youtubemusic' }
+            )
         )
     )
+    .addSubcommand((sub) => sub.setName('sources').setDescription('Lihat daftar lengkap sumber musik yang didukung'))
     .addSubcommand((sub) => sub.setName('stop').setDescription('Hentikan musik dan bersihkan antrean'))
     .addSubcommand((sub) => sub.setName('skip').setDescription('Lewati lagu yang sedang diputar'))
     .addSubcommand((sub) => sub.setName('pause').setDescription('Jeda lagu yang sedang diputar'))
@@ -110,12 +133,46 @@ export const musicCommand: Command = {
     const sub = interaction.options.getSubcommand();
     const guildId = interaction.guildId!;
 
+    // --- SUBCOMMAND: SOURCES (Lihat daftar lengkap sumber yang didukung) ---
+    if (sub === 'sources') {
+      const embed = createBaseEmbed()
+        .setTitle('🎵 SUMBER MUSIK YANG DIDUKUNG • WANDER ROLEPLAY')
+        .setDescription(
+          `Sistem pemutar musik Wander Roleplay bertenaga **Lavalink v4 Serenetia Nodes** dengan dukungan multi-sumber penuh:\n\n` +
+            `• 🔴 **YouTube** \`[✅ Aktif]\`\n` +
+            `  *Video URL, Shorts, Playlist, dan pencarian judul teks (\`ytsearch:\`).*\n\n` +
+            `• 🟢 **Spotify** \`[✅ Aktif]\`\n` +
+            `  *Track, Album, Playlist, Artist URL, dan pencarian judul teks (\`spsearch:\`).*\n\n` +
+            `• 🍎 **Apple Music** \`[✅ Aktif]\`\n` +
+            `  *Song, Album, Playlist URL, dan pencarian judul teks (\`amsearch:\`).*\n\n` +
+            `• 🟠 **SoundCloud** \`[✅ Aktif]\`\n` +
+            `  *Track, Sets, Artist URL, dan pencarian judul teks (\`scsearch:\`).*\n\n` +
+            `• 💙 **Deezer** \`[✅ Aktif]\`\n` +
+            `  *Track, Album, Playlist URL, dan pencarian judul teks (\`dzsearch:\`).*\n\n` +
+            `• 🟡 **Yandex Music** \`[✅ Aktif]\`\n` +
+            `  *Track, Album URL, dan pencarian judul teks (\`ymsearch:\`).*\n\n` +
+            `• 📻 **HTTP Streaming** \`[✅ Aktif]\`\n` +
+            `  *Live Web Radio, Icecast, Shoutcast, siaran langsung, dan playlist file (\`.m3u\`, \`.pls\`)*.\n\n` +
+            `• 📁 **HTTP Audio File** \`[✅ Aktif]\`\n` +
+            `  *Direct URL audio murni: \`.mp3\`, \`.wav\`, \`.flac\`, \`.ogg\`, \`.m4a\`, \`.aac\`.*\n\n` +
+            `• ✨ **And more!** \`[✅ Aktif]\`\n` +
+            `  *Twitch live audio, Bandcamp, dan web audio kustom lainnya.*\n\n` +
+            `🧠 **Sistem Prioritas Cerdas (Smart Search):**\n` +
+            `Saat kamu mengetik judul lagu biasa tanpa link (mode Auto), bot otomatis mencari ke **Spotify** terlebih dahulu. Apabila lagu tidak ditemukan di Spotify (misal versi cover, DJ remix, atau musik FiveM lokal), bot secara pintar langsung melanjutkan ke **YouTube** dan platform lainnya tanpa macet!`
+        )
+        .setFooter({ text: 'Wander Roleplay Music System • Bebas lag & Kualitas High Definition (Lavalink v4)' });
+
+      await interaction.reply({ embeds: [embed] });
+      return;
+    }
+
     // --- SUBCOMMAND: PLAY ---
     if (sub === 'play') {
       const voiceChannel = await checkVoiceChannel(interaction);
       if (!voiceChannel) return;
 
       const query = interaction.options.getString('lagu', true);
+      const platform = (interaction.options.getString('platform') || 'auto') as any;
       await interaction.deferReply();
 
       let player = client.lavalink.getPlayer(guildId);
@@ -139,14 +196,23 @@ export const musicCommand: Command = {
       if (player.get('autoplay') === undefined) player.set('autoplay', true);
       if (player.get('24/7') === undefined) player.set('24/7', false);
 
-      const res = await player.search({ query }, interaction.user);
+      // Smart Multi-Tier Search (Spotify -> YouTube -> Lainnya)
+      const searchRes = await smartSearch(player, query, interaction.user, platform);
 
-      if (!res || !res.tracks.length) {
+      if (!searchRes || !searchRes.result || !searchRes.result.tracks.length) {
         await interaction.editReply({
-          embeds: [createErrorEmbed('TIDAK DITEMUKAN', `Tidak dapat menemukan lagu dengan kata kunci: **${query}**`)]
+          embeds: [
+            createErrorEmbed(
+              'TIDAK DITEMUKAN',
+              `Tidak dapat menemukan lagu dengan kata kunci: **${query}** baik di Spotify maupun YouTube.\nSilakan coba gunakan kata kunci yang lebih spesifik atau link langsung.`
+            )
+          ]
         });
         return;
       }
+
+      const res = searchRes.result;
+      const source = searchRes.source;
 
       if (res.loadType === 'playlist') {
         for (const track of res.tracks) {
@@ -156,7 +222,8 @@ export const musicCommand: Command = {
 
         const embed = createSuccessEmbed(
           'PLAYLIST DITAMBAHKAN',
-          `Berhasil menambahkan **${res.tracks.length}** lagu dari playlist **${res.playlist?.title || 'Playlist'}** ke antrean!`
+          `Berhasil menambahkan **${res.tracks.length}** lagu dari playlist **${res.playlist?.title || 'Playlist'}** ke antrean!\n` +
+            `🌐 **Sumber:** \`${source}\``
         );
 
         await interaction.editReply({ embeds: [embed] });
@@ -169,15 +236,29 @@ export const musicCommand: Command = {
           const embed = createSuccessEmbed(
             'MASUK KE ANTREAN',
             `🎵 [${track.info.title}](${track.info.uri})\n` +
-              `👤 **Author:** \`${track.info.author}\` | ⏱️ **Durasi:** \`${formatMusicDuration(track.info.duration || 0)}\`\n` +
+              `👤 **Author:** \`${track.info.author}\` | 🌐 **Sumber:** \`${source}\` | ⏱️ **Durasi:** \`${formatMusicDuration(track.info.duration || 0)}\`\n` +
               `📊 **Posisi Antrean:** #${player.queue.tracks.length}`
           );
           await interaction.editReply({ embeds: [embed] });
         } else {
-          await interaction.editReply({
-            content: `🔍 Memutar: **${track.info.title}** di <#${voiceChannel.id}>...`
-          });
+          const playEmbed = createBaseEmbed()
+            .setTitle('▶️ MEMULAI PEMUTARAN MUSIK')
+            .setColor('#2ECC71')
+            .setDescription(
+              `🎵 [${track.info.title}](${track.info.uri})\n` +
+                `👤 **Artis / Author:** \`${track.info.author}\`\n` +
+                `🌐 **Sumber:** ${source} | ⏱️ **Durasi:** \`${formatMusicDuration(track.info.duration || 0)}\`\n` +
+                `🔊 **Channel Suara:** <#${voiceChannel.id}>`
+            );
+          if (track.info.artworkUrl) playEmbed.setThumbnail(track.info.artworkUrl);
+          await interaction.editReply({ embeds: [playEmbed] });
         }
+      }
+
+      // Kalibrasi ulang rekomendasi Autoplay berdasarkan lagu baru yang ditambahkan warga
+      if (player.get('autoplay') === true) {
+        const lastTrack = player.queue.tracks[player.queue.tracks.length - 1] || player.queue.current;
+        if (lastTrack) prepareAutoplayNextTrack(player, client, lastTrack).catch(() => null);
       }
 
       if (!player.playing) {
@@ -188,9 +269,9 @@ export const musicCommand: Command = {
 
     // Other subcommands require an active player
     const player = client.lavalink.getPlayer(guildId);
-    if (!player || (!player.queue.current && player.queue.tracks.length === 0)) {
+    if (!player) {
       await interaction.reply({
-        embeds: [createErrorEmbed('TIDAK ADA MUSIK', 'Sedang tidak ada musik yang diputar di server ini.')],
+        embeds: [createErrorEmbed('TIDAK ADA MUSIK', 'Sedang tidak ada pemutar musik aktif di server ini.')],
         ephemeral: true
       });
       return;
@@ -203,12 +284,25 @@ export const musicCommand: Command = {
     // --- SUBCOMMAND: STOP ---
     if (sub === 'stop') {
       player.queue.tracks.splice(0, player.queue.tracks.length);
+      player.set('autoplay_next_track', null);
+      player.set('24/7', false);
       await player.stopPlaying();
-      if (!player.get('24/7')) {
-        await player.destroy();
-      }
+      await player.destroy();
       await interaction.reply({
-        embeds: [createSuccessEmbed('MUSIK DIHENTIKAN', 'Pemutaran musik telah dihentikan dan antrean dibersihkan.')]
+        embeds: [
+          createSuccessEmbed(
+            'MUSIK DIHENTIKAN',
+            'Pemutaran musik telah dihentikan, antrean dibersihkan, dan bot langsung keluar dari voice channel.'
+          )
+        ]
+      });
+      return;
+    }
+
+    if (!player.queue.current && player.queue.tracks.length === 0) {
+      await interaction.reply({
+        embeds: [createErrorEmbed('TIDAK ADA MUSIK', 'Sedang tidak ada lagu yang diputar di antrean.')],
+        ephemeral: true
       });
       return;
     }
@@ -231,22 +325,32 @@ export const musicCommand: Command = {
     // --- SUBCOMMAND: PAUSE ---
     if (sub === 'pause') {
       if (player.paused) {
-        await interaction.reply({ content: '⏸️ Musik sudah dalam keadaan terhenti sementara (paused).', ephemeral: true });
+        await interaction.reply({
+          embeds: [createErrorEmbed('SUDAH DIJEDA', 'Musik sudah dalam keadaan terhenti sementara (paused).')],
+          ephemeral: true
+        });
         return;
       }
       await player.pause();
-      await interaction.reply({ content: '⏸️ Musik dijeda sementara.' });
+      await interaction.reply({
+        embeds: [createSuccessEmbed('MUSIK DIJEDA', '⏸️ Pemutaran musik dijeda sementara.')]
+      });
       return;
     }
 
     // --- SUBCOMMAND: RESUME ---
     if (sub === 'resume') {
       if (!player.paused) {
-        await interaction.reply({ content: '▶️ Musik sedang berjalan secara normal.', ephemeral: true });
+        await interaction.reply({
+          embeds: [createErrorEmbed('SEDANG BERJALAN', '▶️ Musik sedang berjalan secara normal.')],
+          ephemeral: true
+        });
         return;
       }
       await player.resume();
-      await interaction.reply({ content: '▶️ Musik dilanjutkan kembali.' });
+      await interaction.reply({
+        embeds: [createSuccessEmbed('MUSIK DILANJUTKAN', '▶️ Pemutaran musik dilanjutkan kembali.')]
+      });
       return;
     }
 
@@ -254,7 +358,10 @@ export const musicCommand: Command = {
     if (sub === 'nowplaying') {
       const current = player.queue.current;
       if (!current) {
-        await interaction.reply({ content: 'Tidak ada lagu yang sedang diputar.', ephemeral: true });
+        await interaction.reply({
+          embeds: [createErrorEmbed('TIDAK ADA LAGU', 'Tidak ada lagu yang sedang diputar saat ini.')],
+          ephemeral: true
+        });
         return;
       }
       const embed = buildNowPlayingEmbed(player, current);
@@ -265,28 +372,7 @@ export const musicCommand: Command = {
 
     // --- SUBCOMMAND: QUEUE ---
     if (sub === 'queue') {
-      const current = player.queue.current;
-      const tracks = player.queue.tracks;
-
-      const embed = createBaseEmbed()
-        .setTitle(`📜 ANTREAN MUSIK • ${interaction.guild?.name.toUpperCase()}`)
-        .setDescription(
-          `🎵 **Sedang Diputar:**\n` +
-            (current ? `>>> [${current.info.title}](${current.info.uri}) (\`${formatMusicDuration(current.info.duration)}\`)` : '*Tidak ada*') +
-            `\n\n📋 **Daftar Antrean Berikutnya:**\n` +
-            (tracks.length === 0
-              ? '*Antrean kosong. Gunakan `/music play` untuk menambah lagu.*'
-              : tracks
-                  .slice(0, 10)
-                  .map((t, idx) => `**${idx + 1}.** [${t.info.title}](${t.info.uri}) (\`${formatMusicDuration(t.info.duration || 0)}\`)`)
-                  .join('\n')) +
-            (tracks.length > 10 ? `\n*...dan ${tracks.length - 10} lagu lainnya.*` : '')
-        )
-        .addFields({
-          name: '⚙️ Mode Player',
-          value: `📻 Autoplay: \`${player.get('autoplay') ? 'ON' : 'OFF'}\` | ⏰ 24/7: \`${player.get('24/7') ? 'ON' : 'OFF'}\` | 🔁 Loop: \`${player.repeatMode.toUpperCase()}\``
-        });
-
+      const embed = buildQueueEmbed(player, interaction.guild?.name);
       await interaction.reply({ embeds: [embed], ephemeral: true });
       return;
     }
@@ -297,11 +383,22 @@ export const musicCommand: Command = {
       const newState = param !== null ? param : !player.get('autoplay');
       player.set('autoplay', newState);
 
+      if (newState) {
+        const cur = player.queue.tracks[player.queue.tracks.length - 1] || player.queue.current;
+        if (cur) prepareAutoplayNextTrack(player, client, cur).catch(() => null);
+      } else {
+        player.set('autoplay_next_track', null);
+      }
+
       await interaction.reply({
         embeds: [
           createSuccessEmbed(
             'MODE AUTOPLAY DIPERBARUI',
-            `Mode Autoplay sekarang: **${newState ? '🟢 AKTIF (Lagu rekomendasi otomatis dimainkan saat antrean habis)' : '🔴 NONAKTIF'}**.`
+            `Mode Autoplay sekarang: **${
+              newState
+                ? '🟢 AKTIF (Rekomendasi genre sejenis otomatis disiapkan & tampil di antrean /music queue)'
+                : '🔴 NONAKTIF'
+            }**.`
           )
         ]
       });
@@ -352,7 +449,10 @@ export const musicCommand: Command = {
     // --- SUBCOMMAND: SHUFFLE ---
     if (sub === 'shuffle') {
       if (player.queue.tracks.length < 2) {
-        await interaction.reply({ content: 'Antrean membutuhkan minimal 2 lagu untuk diacak.', ephemeral: true });
+        await interaction.reply({
+          embeds: [createErrorEmbed('ANTREAN KURANG', 'Antrean membutuhkan minimal 2 lagu untuk dapat diacak.')],
+          ephemeral: true
+        });
         return;
       }
       player.queue.tracks.sort(() => Math.random() - 0.5);
