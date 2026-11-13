@@ -1,0 +1,33 @@
+{
+  "name": "bot-wander-roleplay",
+  "version": "1.0.0",
+  "description": "Discord Moderator & Multi-function Bot for Wander Roleplay (FiveM)",
+  "main": "index.ts",
+  "type": "module",
+  "scripts": {
+    "start": "bun run index.ts",
+    "dev": "bun --watch index.ts",
+    "start:src": "bun run src/index.ts",
+    "node:start": "node --experimental-sqlite dist/index.js",
+    "build": "tsc"
+  },
+  "keywords": [
+    "discord",
+    "fivem",
+    "wander-roleplay",
+    "moderation",
+    "ticket",
+    "honeypot",
+    "bun"
+  ],
+  "author": "Wander Roleplay",
+  "license": "ISC",
+  "dependencies": {
+    "discord.js": "^14.17.3",
+    "dotenv": "^16.4.7"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.7",
+    "typescript": "^5.7.3"
+  }
+}

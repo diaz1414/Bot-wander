@@ -1,0 +1,72 @@
+{
+  "server": {
+    "name": "Wander Roleplay",
+    "cfxConnect": "cfx.re/join/8eke8kb",
+    "discordInvite": "https://discord.gg/Jc5TuYWbxf",
+    "website": "https://wander-roleplay.com",
+    "footerText": "Wander Roleplay • Wonderful City",
+    "logoUrl": "https://media.discordapp.net/attachments/1548757085020356678/1570703165316276285/Wander_RP_Logo.png?ex=6af80ed0&is=6af6bd50&hm=798aa13587628ea9461bead258eb8a69b243b5ee081e3326976074c8191adb6d&format=webp&quality=lossless&width=1024&height=1024"
+  },
+  "colors": {
+    "primary": "#E67E22",
+    "success": "#2ECC71",
+    "error": "#E74C3C",
+    "warning": "#F1C40F",
+    "info": "#3498DB"
+  },
+  "roles": {
+    "adminRoleId": "",
+    "moderatorRoleId": "",
+    "citizenRoleId": ""
+  },
+  "channels": {
+    "modLogsChannelId": "",
+    "ticketLogsChannelId": "",
+    "welcomeChannelId": "",
+    "goodbyeChannelId": "",
+    "honeypotChannelId": "",
+    "suggestionChannelId": "",
+    "whitelistLogChannelId": ""
+  },
+  "fivem": {
+    "serverIp": "127.0.0.1",
+    "serverPort": 30120,
+    "statusChannelId": "",
+    "statusMessageId": ""
+  },
+  "antiInvite": {
+    "enabled": true,
+    "deleteMessage": true,
+    "warnUser": true
+  },
+  "whitelist": {
+    "enabled": true,
+    "reviewChannelId": "",
+    "citizenRoleId": ""
+  },
+  "honeypot": {
+    "enabled": true,
+    "action": "ban",
+    "deleteDays": 7,
+    "alertChannelId": "",
+    "exemptRoleIds": []
+  },
+  "ticket": {
+    "categoryId": "",
+    "openMessage": "Selamat datang di Customer Support Wander Roleplay!\nSilakan jelaskan kendala atau keperluan kamu secara jelas dan lampirkan bukti foto/video jika ada.",
+    "ticketPrefix": "ticket-"
+  },
+  "welcome": {
+    "enabled": true,
+    "title": "SELAMAT DATANG DI WANDER ROLEPLAY",
+    "description": "Halo {user}, selamat datang di komunitas **Wander Roleplay**!\n\n📜 Silakan baca peraturan kota kami.\n🆔 Ikuti proses verifikasi / whitelist untuk mulai bermain.\n🚗 Kunjungi showroom kota untuk kendaraan impianmu.\n\nKamu adalah warga ke-**{memberCount}** di kota ini!",
+    "thumbnail": true,
+    "bannerUrl": ""
+  },
+  "goodbye": {
+    "enabled": true,
+    "title": "WARGA KELUAR DARI KOTA",
+    "description": "Selamat jalan **{username}**, terima kasih telah menjadi bagian dari Wander Roleplay. Sampai jumpa lagi!",
+    "thumbnail": true
+  }
+}
