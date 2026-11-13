@@ -42,8 +42,13 @@ import { serverinfoCommand } from './commands/general/serverinfo.js';
 import { fivemCommand } from './commands/fivem/fivem.js';
 import { suggestCommand } from './commands/fivem/suggest.js';
 import { whitelistCommand } from './commands/fivem/whitelist.js';
+import { musicCommand } from './commands/music/music.js';
+import { initMusicManager } from './modules/musicManager.js';
 
 const client = new WanderBotClient();
+
+// Inisialisasi Lavalink Manager
+initMusicManager(client);
 
 // List of all commands
 const commands: Command[] = [
@@ -81,7 +86,10 @@ const commands: Command[] = [
   // FiveM & Community Features
   fivemCommand,
   suggestCommand,
-  whitelistCommand
+  whitelistCommand,
+
+  // Music System
+  musicCommand
 ];
 
 // Register commands to client collection

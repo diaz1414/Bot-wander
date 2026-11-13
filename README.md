@@ -59,7 +59,14 @@ Bot Discord resmi untuk server **Wander Roleplay (FiveM)** yang dibangun menggun
 
 9. **⚙️ Konfigurasi Mudah (config.json + SQLite Settings)**
    - Tersedia file [config.json](file:///d:/diaz%20ngoding/bot-wander/config.json) untuk mengatur nama kota, link connect FiveM, warna embed, default channel & role.
-   - Perintah `/settings` untuk memperbarui pengaturan langsung dari Discord tanpa restart!
+   - Perintah `/setup` & `/settings` untuk memperbarui pengaturan langsung dari Discord tanpa restart!
+
+10. **🎵 Sistem Pemutar Musik (Lavalink v4, Autoplay, 24 Jam Standby)**
+    - Terhubung langsung ke dua node Lavalink v4 publik gratis Serenetia (`SSL Port 443` & `Non-SSL Port 80`) dengan sistem failover otomatis.
+    - **Autoplay**: Otomatis memutar lagu rekomendasi yang mirip setelah antrean habis.
+    - **24/7 Mode**: Bot dapat diatur standby 24 jam nonstop di voice channel tanpa pernah disconnect.
+    - **Now Playing Interaktif**: Dilengkapi tombol kontrol visual (Play/Pause, Skip, Stop, Loop, Autoplay, Volume Up/Down, Queue, 24/7).
+    - Mendukung pencarian instan dari YouTube, Spotify, SoundCloud, dan direct link.
 
 ---
 
@@ -214,6 +221,14 @@ bot-wander/
 | `/fivem status & setup` | Semua / Admin | Cek status server FiveM live (pemain aktif, ping, connect) |
 | `/suggest kirim & review` | Semua / Admin | Kotak aspirasi warga dengan tombol vote setuju/tidak |
 | `/whitelist panel` | Owner & Admin | Formulir pendaftaran karakter IC & verifikasi warga baru |
+| `/music play` | Semua Warga | Putar lagu dari YouTube, Spotify, SoundCloud, atau judul lagu |
+| `/music stop & skip` | Semua Warga | Hentikan pemutaran musik atau lewati ke lagu berikutnya |
+| `/music pause & resume`| Semua Warga | Jeda atau lanjutkan pemutaran musik saat ini |
+| `/music queue & nowplaying`| Semua Warga | Lihat daftar antrean lagu & progress bar lagu sekarang |
+| `/music autoplay` | Semua Warga | Mode putar otomatis lagu rekomendasi mirip setelah antrean habis |
+| `/music 247` | Semua Warga | Mode standby 24 jam bot di voice channel tanpa disconnect |
+| `/music volume & loop` | Semua Warga | Sesuaikan volume (1-150%) dan mode pengulangan lagu/antrean |
+| `/music shuffle` | Semua Warga | Acak urutan seluruh lagu dalam antrean |
 | `/ping` | Semua Warga | Cek latensi bot, RAM, uptime, dan status database |
 | `/help` | Semua Warga | Panduan interaktif menu bantuan bot |
 | `/serverinfo` | Semua Warga | Informasi kota Wander Roleplay, member, & link connect |

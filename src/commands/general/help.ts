@@ -120,6 +120,11 @@ export const helpCommand: Command = {
           name: '🎉 Giveaway & Polling',
           value: '`/giveaway start`, `/giveaway end`, `/giveaway reroll`, `/poll create`, `/poll end`',
           inline: true
+        },
+        {
+          name: '🎵 Sistem Musik (Lavalink v4)',
+          value: '`/music play`, `/music stop`, `/music skip`, `/music autoplay`, `/music 247`, `/music queue`, `/music volume`',
+          inline: true
         }
       )
       .setFooter({ text: `${config.server.footerText} • Gunakan /help perintah:[nama] untuk cek perintah tertentu` });
@@ -168,6 +173,11 @@ export const helpCommand: Command = {
           .setDescription('Undian berhadiah dengan timer SQLite & voting warga real-time')
           .setEmoji('🎉')
           .setValue('help_giveaway_poll'),
+        new StringSelectMenuOptionBuilder()
+          .setLabel('Sistem Musik Wander Roleplay')
+          .setDescription('Pemutar musik Lavalink v4, Autoplay, 24 Jam Standby, Loop & Volume')
+          .setEmoji('🎵')
+          .setValue('help_music'),
         new StringSelectMenuOptionBuilder()
           .setLabel('Informasi Umum & Utilitas')
           .setDescription('Ping latensi bot, statistik kota serverinfo')

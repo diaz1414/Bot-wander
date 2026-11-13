@@ -17,7 +17,20 @@ export async function onReady(client: WanderBotClient): Promise<void> {
   // 2. Start Background Giveaway Scheduler
   startGiveawayScheduler(client);
 
-  // 3. Register Slash Commands
+  // 3. Initialize Lavalink v4 Client
+  try {
+    if (client.lavalink) {
+      console.log('[LAVALINK] Menginisialisasi Lavalink Client & Nodes...');
+      await client.lavalink.init({
+        id: client.user!.id,
+        username: client.user!.username
+      });
+    }
+  } catch (lavalinkErr) {
+    console.error('[LAVALINK] Gagal menginisialisasi Lavalink:', lavalinkErr);
+  }
+
+  // 4. Register Slash Commands
   try {
     const commandsData = client.commands.map((cmd) => cmd.data.toJSON());
     const rest = new REST({ version: '10' }).setToken(config.env.token);

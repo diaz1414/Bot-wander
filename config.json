@@ -44,6 +44,28 @@
     "reviewChannelId": "",
     "citizenRoleId": ""
   },
+  "lavalink": {
+    "nodes": [
+      {
+        "id": "Serenetia-V4-SSL",
+        "host": "lavalinkv4.serenetia.com",
+        "port": 443,
+        "authorization": "https://seretia.link/discord",
+        "secure": true
+      },
+      {
+        "id": "Serenetia-V4-NonSSL",
+        "host": "lavalinkv4.serenetia.com",
+        "port": 80,
+        "authorization": "https://seretia.link/discord",
+        "secure": false
+      }
+    ],
+    "defaultVolume": 80,
+    "defaultSearchPlatform": "ytsearch",
+    "autoplay": true,
+    "twentyFourSeven": false
+  },
   "honeypot": {
     "enabled": true,
     "action": "ban",

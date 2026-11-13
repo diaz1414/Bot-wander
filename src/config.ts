@@ -50,6 +50,19 @@ export interface BotConfigFile {
     reviewChannelId: string;
     citizenRoleId: string;
   };
+  lavalink?: {
+    nodes: Array<{
+      id?: string;
+      host: string;
+      port: number;
+      authorization: string;
+      secure?: boolean;
+    }>;
+    defaultVolume?: number;
+    defaultSearchPlatform?: string;
+    autoplay?: boolean;
+    twentyFourSeven?: boolean;
+  };
   honeypot: {
     enabled: boolean;
     action: 'ban' | 'kick' | 'timeout';

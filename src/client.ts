@@ -1,8 +1,10 @@
 import { Client, Collection, GatewayIntentBits, Partials } from 'discord.js';
+import type { LavalinkManager } from 'lavalink-client';
 import type { Command, Event } from './types/index.js';
 
 export class WanderBotClient extends Client {
   public commands: Collection<string, Command> = new Collection();
+  public lavalink!: LavalinkManager;
 
   constructor() {
     super({
@@ -11,7 +13,8 @@ export class WanderBotClient extends Client {
         GatewayIntentBits.GuildMembers,
         GatewayIntentBits.GuildMessages,
         GatewayIntentBits.MessageContent,
-        GatewayIntentBits.GuildMessageReactions
+        GatewayIntentBits.GuildMessageReactions,
+        GatewayIntentBits.GuildVoiceStates
       ],
       partials: [
         Partials.Message,

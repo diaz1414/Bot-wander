@@ -36,6 +36,11 @@ import {
 import { announcementSessions } from '../modules/announcementSession.js';
 import { config, reloadConfig } from '../config.js';
 import { createSetupDashboardEmbed, createSetupDashboardRows } from '../commands/admin/setup.js';
+import {
+  buildNowPlayingEmbed,
+  buildNowPlayingComponents,
+  formatMusicDuration
+} from '../modules/musicManager.js';
 
 export async function onInteractionCreate(client: WanderBotClient, interaction: Interaction): Promise<void> {
   try {
@@ -56,6 +61,140 @@ export async function onInteractionCreate(client: WanderBotClient, interaction: 
     // 2. Handle Button Interactions
     if (interaction.isButton()) {
       const customId = interaction.customId;
+
+      // --- MUSIC CONTROLS ---
+      if (customId.startsWith('music_')) {
+        const player = client.lavalink.getPlayer(interaction.guildId!);
+        if (!player) {
+          await interaction.reply({ content: '❌ Tidak ada musik yang sedang diputar di server ini.', ephemeral: true });
+          return;
+        }
+
+        const member = interaction.member as GuildMember;
+        if (!member.voice.channel || member.voice.channel.id !== player.voiceChannelId) {
+          await interaction.reply({ content: '❌ Kamu harus berada di voice channel yang sama dengan bot untuk menggunakan tombol ini!', ephemeral: true });
+          return;
+        }
+
+        if (customId === 'music_toggle_pause') {
+          if (player.paused) {
+            await player.resume();
+            await interaction.reply({ content: '▶️ Musik dilanjutkan!', ephemeral: true });
+          } else {
+            await player.pause();
+            await interaction.reply({ content: '⏸️ Musik dijeda sementara!', ephemeral: true });
+          }
+          const current = player.queue.current;
+          if (current) {
+            const embed = buildNowPlayingEmbed(player, current);
+            const components = buildNowPlayingComponents(player);
+            await interaction.message.edit({ embeds: [embed], components }).catch(() => null);
+          }
+          return;
+        }
+
+        if (customId === 'music_skip') {
+          await player.skip();
+          await interaction.reply({ content: '⏭️ Lagu berhasil dilewati!', ephemeral: true });
+          return;
+        }
+
+        if (customId === 'music_stop') {
+          player.queue.tracks.splice(0, player.queue.tracks.length);
+          await player.stopPlaying();
+          if (!player.get('24/7')) {
+            await player.destroy();
+          }
+          await interaction.reply({ content: '⏹️ Pemutaran musik dihentikan dan antrean dibersihkan.', ephemeral: true });
+          await interaction.message.delete().catch(() => null);
+          return;
+        }
+
+        if (customId === 'music_toggle_loop') {
+          const modes: ('off' | 'track' | 'queue')[] = ['off', 'track', 'queue'];
+          const currentIndex = modes.indexOf(player.repeatMode);
+          const nextMode = modes[(currentIndex + 1) % modes.length];
+          await player.setRepeatMode(nextMode);
+          await interaction.reply({ content: `🔁 Mode Loop sekarang: **${nextMode.toUpperCase()}**`, ephemeral: true });
+          const current = player.queue.current;
+          if (current) {
+            const embed = buildNowPlayingEmbed(player, current);
+            const components = buildNowPlayingComponents(player);
+            await interaction.message.edit({ embeds: [embed], components }).catch(() => null);
+          }
+          return;
+        }
+
+        if (customId === 'music_toggle_autoplay') {
+          const current = player.get('autoplay') === true;
+          player.set('autoplay', !current);
+          await interaction.reply({ content: `📻 Autoplay sekarang: **${!current ? '🟢 ON' : '🔴 OFF'}**`, ephemeral: true });
+          const cur = player.queue.current;
+          if (cur) {
+            const embed = buildNowPlayingEmbed(player, cur);
+            const components = buildNowPlayingComponents(player);
+            await interaction.message.edit({ embeds: [embed], components }).catch(() => null);
+          }
+          return;
+        }
+
+        if (customId === 'music_toggle_247') {
+          const current = player.get('24/7') === true;
+          player.set('24/7', !current);
+          await interaction.reply({ content: `⏰ Mode 24/7 Standby sekarang: **${!current ? '🟢 ON' : '🔴 OFF'}**`, ephemeral: true });
+          const cur = player.queue.current;
+          if (cur) {
+            const embed = buildNowPlayingEmbed(player, cur);
+            const components = buildNowPlayingComponents(player);
+            await interaction.message.edit({ embeds: [embed], components }).catch(() => null);
+          }
+          return;
+        }
+
+        if (customId === 'music_vol_down') {
+          const newVol = Math.max(player.volume - 10, 10);
+          await player.setVolume(newVol);
+          await interaction.reply({ content: `🔉 Volume dikurangi menjadi: **${newVol}%**`, ephemeral: true });
+          const cur = player.queue.current;
+          if (cur) {
+            const embed = buildNowPlayingEmbed(player, cur);
+            const components = buildNowPlayingComponents(player);
+            await interaction.message.edit({ embeds: [embed], components }).catch(() => null);
+          }
+          return;
+        }
+
+        if (customId === 'music_vol_up') {
+          const newVol = Math.min(player.volume + 10, 150);
+          await player.setVolume(newVol);
+          await interaction.reply({ content: `🔊 Volume dinaikkan menjadi: **${newVol}%**`, ephemeral: true });
+          const cur = player.queue.current;
+          if (cur) {
+            const embed = buildNowPlayingEmbed(player, cur);
+            const components = buildNowPlayingComponents(player);
+            await interaction.message.edit({ embeds: [embed], components }).catch(() => null);
+          }
+          return;
+        }
+
+        if (customId === 'music_show_queue') {
+          const current = player.queue.current;
+          const tracks = player.queue.tracks;
+          const embed = createBaseEmbed()
+            .setTitle(`📜 DAFTAR ANTREAN MUSIK`)
+            .setDescription(
+              `🎵 **Sedang Diputar:**\n` +
+                (current ? `>>> [${current.info.title}](${current.info.uri}) (\`${formatMusicDuration(current.info.duration || 0)}\`)` : '*Tidak ada*') +
+                `\n\n📋 **Antrean Berikutnya:**\n` +
+                (tracks.length === 0
+                  ? '*Antrean kosong.*'
+                  : tracks.slice(0, 10).map((t, idx) => `**${idx + 1}.** [${t.info.title}](${t.info.uri}) (\`${formatMusicDuration(t.info.duration || 0)}\`)`).join('\n')) +
+                (tracks.length > 10 ? `\n*...dan ${tracks.length - 10} lagu lainnya.*` : '')
+            );
+          await interaction.reply({ embeds: [embed], ephemeral: true });
+          return;
+        }
+      }
 
       // --- GIVEAWAY JOIN BUTTON ---
       if (customId === 'giveaway_join') {
@@ -661,6 +800,23 @@ export async function onInteractionCreate(client: WanderBotClient, interaction: 
                 `• \`/giveaway reroll [message_id]\` — Memilih ulang pemenang baru.\n` +
                 `• \`/poll create [pertanyaan] [opsi1] [opsi2] ...\` — Membuat voting interaktif dengan live grafik batang.\n` +
                 `• \`/poll end [message_id]\` — Menutup polling dan menampilkan hasil akhir.`
+            );
+        } else if (selected === 'help_music') {
+          embed.setTitle('🎵 PANDUAN SISTEM MUSIK (LAVALINK V4)')
+            .setDescription(
+              `Pemutar musik audio jernih bertenaga Lavalink v4 gratis Serenetia:\n\n` +
+                `• \`/music play [lagu/link]\` — Putar lagu dari YouTube, Spotify, SoundCloud, atau kata kunci pencarian.\n` +
+                `• \`/music stop\` — Berhenti memutar dan bersihkan antrean lagu.\n` +
+                `• \`/music skip\` — Lewati lagu yang sedang diputar ke lagu berikutnya.\n` +
+                `• \`/music pause\` & \`/music resume\` — Jeda atau lanjutkan pemutaran musik.\n` +
+                `• \`/music queue\` — Lihat daftar 10 lagu antrean teratas.\n` +
+                `• \`/music nowplaying\` — Lihat detail lagu yang diputar, lirik, dan progress bar.\n` +
+                `• \`/music autoplay [status?]\` — Mode putar otomatis lagu rekomendasi mirip setelah antrean habis.\n` +
+                `• \`/music 247 [status?]\` — Mode 24 jam bot standby di voice channel tanpa pernah disconnect.\n` +
+                `• \`/music volume [1-150]\` — Sesuaikan kenyaringan volume audio bot.\n` +
+                `• \`/music loop [track/queue/off]\` — Ulangi 1 lagu atau seluruh playlist.\n` +
+                `• \`/music shuffle\` — Acak urutan lagu dalam antrean.\n\n` +
+                `💡 **Tombol Kontrol Interaktif:** Setiap lagu diputar, bot mengirimkan kontrol Now Playing dengan tombol Pause, Skip, Stop, Loop, Autoplay, Volume, dan 24/7.`
             );
         } else if (selected === 'help_general') {
           embed.setTitle('ℹ️ INFORMASI UMUM & UTILITAS')
