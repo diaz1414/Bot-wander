@@ -410,16 +410,28 @@ export function buildNowPlayingEmbed(player: Player, track: Track): any {
     upNextLine = `\n\n📻 **Berikutnya (Autoplay Rekomendasi):** [${nextAutoplay.info.title}](${nextAutoplay.info.uri}) (\`${nextAutoplay.info.author}\`)`;
   }
 
+  const isFromAutoplay = (track as any).isAutoplay === true;
+  const vibe = (track as any).autoplayVibe;
+
+  const title = isFromAutoplay
+    ? '📻 SEDANG DIPUTAR • AUTOPLAY REKOMENDASI'
+    : '🎵 SEDANG DIPUTAR • WANDER MUSIC';
+
+  const autoplayBadgeLine = isFromAutoplay
+    ? `🏷️ **Autoplay Mode:** Rekomendasi Genre Sejenis${vibe ? ` (\`${vibe}\`)` : ''}\n`
+    : '';
+
   const embed = createBaseEmbed()
-    .setTitle('🎵 SEDANG DIPUTAR • WANDER MUSIC')
+    .setTitle(title)
     .setDescription(
       `### [${track.info.title}](${track.info.uri})\n` +
         `👤 **Penyanyi / Author:** \`${track.info.author || 'Tidak Diketahui'}\`\n` +
         `🌐 **Sumber Audio:** ${sourceBadge}\n` +
+        autoplayBadgeLine +
         `⏱️ **Durasi:** ${bar}${upNextLine}\n\n` +
         `🔊 **Volume:** \`${player.volume}%\` | 🔁 **Loop:** \`${loopMode.toUpperCase()}\` | 📻 **Autoplay:** \`${isAutoplay ? 'ON' : 'OFF'}\` | ⏰ **24/7:** \`${is247 ? 'ON' : 'OFF'}\``
     )
-    .setColor('#9B59B6');
+    .setColor(isFromAutoplay ? '#9B59B6' : '#3498DB');
 
   if (track.info.artworkUrl) {
     embed.setThumbnail(track.info.artworkUrl);
@@ -430,6 +442,10 @@ export function buildNowPlayingEmbed(player: Player, track: Track): any {
     embed.setFooter({
       text: `Diminta oleh: ${requester.tag} • Wander Roleplay Music`,
       iconURL: requester.displayAvatarURL()
+    });
+  } else if (isFromAutoplay) {
+    embed.setFooter({
+      text: 'Wander Roleplay Music • Rekomendasi otomatis sejenis tanpa pengulangan'
     });
   }
 
@@ -642,6 +658,12 @@ export function initMusicManager(client: WanderBotClient): void {
       const channel = (await client.channels.fetch(player.textChannelId).catch(() => null)) as TextChannel | null;
       if (!channel || !channel.isTextBased()) return;
 
+      // Hapus kartu kontrol sebelumnya agar chat bersih dan tidak menumpuk/dobel
+      const oldMsgId = player.get('nowplaying_msg_id') as string | undefined;
+      if (oldMsgId) {
+        channel.messages.delete(oldMsgId).catch(() => null);
+      }
+
       const embed = buildNowPlayingEmbed(player, track);
       const components = buildNowPlayingComponents(player);
 
@@ -667,37 +689,11 @@ export function initMusicManager(client: WanderBotClient): void {
 
         if (nextTrack) {
           player.set('autoplay_next_track', null);
-          (nextTrack as any).requester = client.user;
+          (nextTrack as any).requester = undefined;
+          (nextTrack as any).isAutoplay = true;
           await player.queue.add(nextTrack);
 
-          if (player.textChannelId) {
-            const channel = (await client.channels.fetch(player.textChannelId).catch(() => null)) as TextChannel | null;
-            if (channel && channel.isTextBased()) {
-              const badge = getSourceBadge(nextTrack.info.sourceName, nextTrack.info.uri);
-              const vibe = (nextTrack as any).autoplayVibe || `${track.info.author} Radio`;
-
-              const autoplayEmbed = createBaseEmbed()
-                .setTitle('📻 AUTOPLAY • REKOMENDASI GENRE SEJENIS')
-                .setColor('#9B59B6')
-                .setDescription(
-                  `Memutar lagu rekomendasi berikutnya:\n` +
-                    `### [${nextTrack.info.title}](${nextTrack.info.uri})\n` +
-                    `👤 **Artis / Penyanyi:** \`${nextTrack.info.author}\`\n` +
-                    `🌐 **Sumber Audio:** ${badge} | ⏱️ **Durasi:** \`${formatMusicDuration(nextTrack.info.duration || 0)}\`\n` +
-                    `🏷️ **Vibe / Genre:** \`${vibe}\``
-                )
-                .setFooter({
-                  text: 'Wander Roleplay Music • Rekomendasi otomatis sejenis tanpa pengulangan'
-                });
-
-              if (nextTrack.info.artworkUrl) {
-                autoplayEmbed.setThumbnail(nextTrack.info.artworkUrl);
-              }
-
-              await channel.send({ embeds: [autoplayEmbed] });
-            }
-          }
-
+          // Putar langsung, trackStart akan menampilkan satu kartu pemutar resmi yang rapi
           await player.play();
           return;
         }
