@@ -585,18 +585,76 @@ export function buildNowPlayingComponents(player: Player): ActionRowBuilder<Butt
 export function initMusicManager(client: WanderBotClient): void {
   const nodes = config.lavalink?.nodes || [
     {
-      id: 'Serenetia-V4-SSL',
+      id: 'Nazha-Main',
+      host: 'lavalink.nazha.online',
+      port: 443,
+      authorization: 'nazhafreelava',
+      secure: true,
+      retryAmount: 50,
+      retryDelay: 15000,
+      requestTimeout: 10000
+    },
+    {
+      id: 'GDjkhp-Nodelink',
+      host: 'nodelink.gdjkhp.com',
+      port: 3000,
+      authorization: 'youshallnotpass',
+      secure: false,
+      retryAmount: 50,
+      retryDelay: 15000,
+      requestTimeout: 10000
+    },
+    {
+      id: 'Vinster-Lavalink',
+      host: 'freelavalinkvinster.in',
+      port: 9018,
+      authorization: 'youshallnotpass',
+      secure: false,
+      retryAmount: 50,
+      retryDelay: 15000,
+      requestTimeout: 10000
+    },
+    {
+      id: 'Kasawa-Asia',
+      host: 'lava2.kasawa.pro',
+      port: 2334,
+      authorization: 'youshallnotpass',
+      secure: false,
+      retryAmount: 50,
+      retryDelay: 15000,
+      requestTimeout: 10000
+    },
+    {
+      id: 'TriniumHost-SSL',
+      host: 'lavalink-v4.triniumhost.com',
+      port: 443,
+      authorization: 'free',
+      secure: true,
+      retryAmount: 50,
+      retryDelay: 15000,
+      requestTimeout: 10000
+    },
+    {
+      id: 'Serenetia-SSL',
       host: 'lavalinkv4.serenetia.com',
       port: 443,
       authorization: 'https://seretia.link/discord',
-      secure: true
+      secure: true,
+      retryAmount: 50,
+      retryDelay: 15000,
+      requestTimeout: 10000
     },
     {
-      id: 'Serenetia-V4-NonSSL',
+      id: 'Serenetia-NonSSL',
       host: 'lavalinkv4.serenetia.com',
       port: 80,
       authorization: 'https://seretia.link/discord',
-      secure: false
+      secure: false,
+      standby: true,
+      standbyFor: 'Serenetia-SSL',
+      retryAmount: 50,
+      retryDelay: 15000,
+      requestTimeout: 10000
     }
   ];
 
@@ -606,7 +664,12 @@ export function initMusicManager(client: WanderBotClient): void {
       host: n.host,
       port: n.port,
       authorization: n.authorization,
-      secure: n.secure ?? n.port === 443
+      secure: n.secure ?? n.port === 443,
+      retryAmount: n.retryAmount ?? 50,
+      retryDelay: n.retryDelay ?? 15000,
+      requestTimeout: n.requestTimeout ?? 10000,
+      standby: n.standby,
+      standbyFor: n.standbyFor
     })),
     sendToShard: (guildId, payload) => {
       const guild = client.guilds.cache.get(guildId);

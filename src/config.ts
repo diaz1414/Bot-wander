@@ -57,6 +57,11 @@ export interface BotConfigFile {
       port: number;
       authorization: string;
       secure?: boolean;
+      retryAmount?: number;
+      retryDelay?: number;
+      requestTimeout?: number;
+      standby?: boolean;
+      standbyFor?: string;
     }>;
     defaultVolume?: number;
     defaultSearchPlatform?: string;
